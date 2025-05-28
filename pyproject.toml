@@ -4,9 +4,9 @@ dynamic = ["version"]
 description = "Gaussian decomposition inversion method to estimate phytoplankton pigment concentrations from PACE OCI remote sensing reflectance. Algorithm is called 'GPig'."
 readme = "README.md"
 authors = [
-    { name = 'Max Danenhower'},
-    { name = 'Charles Stern'},
-    { name = 'Ali Chase'}
+    { name = "Max Danenhower"},
+    { name = "Charles Stern"},
+    { name = "Ali Chase"}
 ]
 requires-python = ">=3.10"
 dependencies = [
