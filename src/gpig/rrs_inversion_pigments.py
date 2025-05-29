@@ -1,14 +1,15 @@
-from pathlib import Path
-import numpy as np
-import pandas as pd
-from typing import Tuple, Union
-import numpy as np
-from scipy.optimize import least_squares
-
 '''
 Originally developed in MatLab by Ali Chase and can be found here: https://github.com/alisonpchase/Rrs_inversion_pigments
 Translated to Python by Max Danenhower, Charles Stern, and Ali Chase.
 '''
+
+from typing import Tuple, Union
+from importlib import resources
+
+import numpy as np
+import pandas as pd
+from scipy.optimize import least_squares
+
 
 G1 = 0.0949  # g1 and g2 are values from Gordon et al., 1988
 G2 = 0.0794
@@ -462,11 +463,9 @@ def betasw124_ZHH2009(lambda_, S, Tc, delta=0.039):
 
 
 def tempsal_corr(lambda_):
-    """
-    """
-    pwts = pd.read_csv(
-        f"{Path(__file__).parent.resolve()}/resources/Sullivan_pure_water_temp_sal.csv"
-    )
+    """ """
+    with resources.path(__name__, "resources/Sullivan_pure_water_temp_sal.csv") as p:
+        pwts = pd.read_csv(p)
 
     if lambda_.min() < 400 or lambda_.min() > 750:
         raise NotImplementedError(
