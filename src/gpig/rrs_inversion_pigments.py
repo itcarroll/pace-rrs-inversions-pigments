@@ -181,8 +181,8 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
     # matrix:   A   A_unc   B   B_unc
     coeffs = np.array([
             [0.048, 0.008, 0.643, 0.068],
-            [0.033, 0.013, 0.327, 0.074],
             [0.043, 0.009, 0.561, 0.059],
+            [0.033, 0.013, 0.327, 0.074],
             [0.079, 0.024, 0.823, 0.105]])
     
     pigmedian = np.zeros(4)
@@ -200,7 +200,7 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
         prc = np.percentile(pigest, [16, 84])
         pigunc[ii] = (prc[1] - prc[0]) / 2
 
-    vars_units = 'Chla, Chlb, Chlc1+c2, PPC; all in mg m^-3'
+    vars_units = 'Chla, Chlc1+c2, Chlb, PPC; all in mg m^-3'
     amps = Amp2[10:14]
 
     return pigmedian, pigunc, vars_units, amps
