@@ -180,10 +180,10 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
     # Chase et al., 2017 (JGR-Oceans) and a Monte Carlo method
     # matrix:   A   A_unc   B   B_unc
     coeffs = np.array([
-            [0.048, 0.008, 0.643, 0.068],
-            [0.043, 0.009, 0.561, 0.059],
-            [0.033, 0.013, 0.327, 0.074],
-            [0.079, 0.024, 0.823, 0.105]])
+            [0.022, 0.008, 0.563, 0.068],
+            [0.014, 0.009, 0.14, 0.059],
+            [0.026, 0.013, 0.286, 0.074],
+            [0.026, 0.024, 0.194, 0.105]])
     
     pigmedian = np.zeros(4)
     pigunc = np.zeros(4)
