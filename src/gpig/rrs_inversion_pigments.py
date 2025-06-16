@@ -95,8 +95,8 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
     Upos = (-G1 + np.sqrt(G1**2 + 4*G2*rrs))/(2*G2)
     Uunc = (-G1 + np.sqrt(G1**2 + 4*G2*rrs_unc))/(2*G2)
 
-    peaks = np.array([384,413,435,461,464,490,532,583])
-    sig = np.array([23,9,14,11,19,19,20,20])
+    peaks = np.array([384,413,435,461,464,490,532,583,623,644,655,676])
+    sig = np.array([23,9,14,11,19,19,20,20,15,12,12,9])
 
     # Define the center peak locations (nm) and widths (nm) of the Gaussian functions
     # sig = sigma, where FWHM = sigma*2.355 and FWHM = full width at half max
@@ -138,8 +138,8 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
     NAP = (Amp2[1]*nap)
     CP = (Amp2[6]*cp)
 
-    peak_locs=Amp2[16:24]
-    sigs=Amp2[24:32]
+    peak_locs=Amp2[20:32]
+    sigs=Amp2[32:44]
 
     # define Gaussian shapes
     gaus = np.zeros((len(wl), len(peak_locs)))
@@ -210,8 +210,8 @@ def lsqnonlin_Amp_gen(Amp0,Upos,Uunc,wvns,bb_sw_r,a_sw_r,lnot):
     The following function uses a non-linear least squares solver to minimize
     the difference between the measured Rrs and the modeled Rrs
     '''
-    peak_locs = Amp0[16:24]
-    sig = Amp0[24:32]
+    peak_locs=Amp0[20:32]
+    sig=Amp0[32:44]
 
     # define cdom and nap functions; both slope and magnitude are allowed to vary
     cdom = np.exp(-Amp0[2] * (wvns-lnot))
