@@ -89,14 +89,11 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
 
     # Calculate the positive solution for U using rrs, where U = bb/(bb+a).
     # This model and g coefficients are from Gordon et al., 1988
-    Upos = np.zeros(len(wl))
-    Uunc = np.zeros(len(wl))
-
     Upos = (-G1 + np.sqrt(G1**2 + 4*G2*rrs))/(2*G2)
     Uunc = (-G1 + np.sqrt(G1**2 + 4*G2*rrs_unc))/(2*G2)
 
-    peaks = np.array([384,413,435,461,464,490,532,583,623,644,655,676])
-    sig = np.array([23,9,14,11,19,19,20,20,15,12,12,9])
+    peaks = np.array([384,413,435,461,464,490,532,583])
+    sig = np.array([23,9,14,11,19,19,20,20])
 
     # Define the center peak locations (nm) and widths (nm) of the Gaussian functions
     # sig = sigma, where FWHM = sigma*2.355 and FWHM = full width at half max
@@ -125,77 +122,33 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
     UB = [s_nap[2], m_nap[2], s_cdom[2], m_cdom[2], bbpbp_ratio[2], cpgam[2], m_cp[2],C_fluor[2]] + np.tile(m_gaus[2],len(peaks)).tolist() + (peaks+1).tolist() + (sig+1).tolist()
 
     # Run the inversion using a non-linear least squares inversion function
-    result = least_squares(lsqnonlin_Amp_gen, Amp0, bounds=(LB, UB), ftol=1e-6, xtol=1e-6, gtol=1e-6, 
+    result = least_squares(lsqnonlin_Amp_gen, np.array(Amp0), bounds=(LB, UB), ftol=1e-6, xtol=1e-6, gtol=1e-6, 
                            args=(Upos, Uunc, wl, bb_sw, a_sw, LNOT))
+
     Amp2 = result.x
 
-    # rebuild spectral components with the results of the inversion 
-    cdom = np.exp(-Amp2[2]*(wl-LNOT))
-    nap = np.exp(-Amp2[0]*(wl-LNOT))
-    cp = (wl/LNOT)**(-Amp2[5])
-
-    CDOM = (Amp2[3]*cdom)
-    NAP = (Amp2[1]*nap)
-    CP = (Amp2[6]*cp)
-
-    peak_locs=Amp2[20:32]
-    sigs=Amp2[32:44]
-
-    # define Gaussian shapes
-    gaus = np.zeros((len(wl), len(peak_locs)))
-
-    for ii in range(len(peak_locs)):
-        for jj in range(len(wl)):
-            gaus[jj, ii] = np.exp(-0.5 * ((wl[jj] - peak_locs[ii]) / sigs[ii])**2)
-
-    # multiply each Gaussian by the initial guess amplitude
-    for i in range(len(peak_locs)):
-        gaus[:, i] = Amp2[i + 8] * gaus[:, i]
-
-    # Sum all of the Gaussians to get a_phi
-    APHI = np.zeros(len(wl))
-    for j in range(len(wl)):
-        APHI[j] = 0
-        for i in range(len(peak_locs)):
-           APHI[j] += np.sum(gaus[j, i])
-
-    # particulate absorbtion
-    AP = NAP + APHI.T
-
-    # particulate backscattering
-    BBP = Amp2[4]*(CP-AP)
-
-    # Define the fluorescence Gaussian; 685 peak for Chl fluor; 10.6 sigma
-    fluor = np.zeros_like(wl)
-    fluor = np.exp(-0.5 * ((wl - 685) / 10.6)**2)
-
-    F = Amp2[7]*fluor
-
-    denom = AP.T + CDOM.T + a_sw.T + BBP.T + bb_sw
-    numer = BBP.T + bb_sw + F
-    Unew = numer/denom
-    rrs_recon = G1*Unew + G2*(Unew**2) 
-
     # Estimate pigment concentrations and their uncertainties with coefficients reported in
-    # Chase et al., 2017 (JGR-Oceans) and a Monte Carlo method
+    # Chase et al., 2017 (JGR-Oceans) and a Monte Carlo method. 
+    # NOTE: these coefficients have been recomputed using the same method in Chase et al., 2017 (JGR-Oceans) using new data
     # matrix:   A   A_unc   B   B_unc
+
     coeffs = np.array([
             [0.022, 0.008, 0.563, 0.068],
             [0.014, 0.009, 0.14, 0.059],
             [0.026, 0.013, 0.286, 0.074],
             [0.026, 0.024, 0.194, 0.105]])
-    
-    pigmedian = np.zeros(4)
-    pigunc = np.zeros(4)
 
     np.seterr(divide='ignore')
+
+    pigmedian = np.zeros(4)
+    pigunc = np.zeros(4)
 
     for ii in range(4):
         mc = np.random.randn(10000, 1) * coeffs[ii, [1, 3]]
         As = coeffs[ii, 0] + mc[:, 0]
         As[As < 0] = 0  # prevent imaginary pigment values
         Bs = coeffs[ii, 2] + mc[:, 1]
-        pigest = (Amp2[10 + ii] / As.T) ** (1.0 / Bs.T)
+        pigest = (Amp2[10 + ii] / As) ** (1.0 / Bs)
         pigmedian[ii] = np.median(pigest)
         prc = np.percentile(pigest, [16, 84])
         pigunc[ii] = (prc[1] - prc[0]) / 2
@@ -210,57 +163,53 @@ def lsqnonlin_Amp_gen(Amp0,Upos,Uunc,wvns,bb_sw_r,a_sw_r,lnot):
     The following function uses a non-linear least squares solver to minimize
     the difference between the measured Rrs and the modeled Rrs
     '''
-    peak_locs=Amp0[20:32]
-    sig=Amp0[32:44]
 
-    # define cdom and nap functions; both slope and magnitude are allowed to vary
-    cdom = np.exp(-Amp0[2] * (wvns-lnot))
-    CDOM = Amp0[3]*cdom
+    # Unpack parameters
+    slope_nap, mag_nap = Amp0[0], Amp0[1]
+    slope_cdom, mag_cdom = Amp0[2], Amp0[3]
+    bbp_ratio = Amp0[4]
+    slope_cp = Amp0[5]
+    mag_cp = Amp0[6]
+    fluor_amp = Amp0[7]
 
-    nap = np.exp(-Amp0[0] * (wvns-lnot))
-    NAP = Amp0[1]*nap
+    amps = Amp0[8:16]                # Amplitudes of Gaussians
+    peak_locs = Amp0[16:24]          # Centers
+    sig = Amp0[24:32]                # Widths
 
-    # define Gaussian shapes
-    gaus = np.zeros((len(wvns), len(peak_locs)))
+    # Ensure broadcasting works
+    wvns_col = wvns[:, np.newaxis]   # Shape (N, 1)
+    peak_locs = peak_locs[np.newaxis, :]  # Shape (1, 12)
+    sig = sig[np.newaxis, :]
+    amps = amps[np.newaxis, :]
 
-    for ii in range(len(peak_locs)):
-        for jj in range(len(wvns)):
-            gaus[jj, ii] = np.exp(-0.5 * ((wvns[jj] - peak_locs[ii]) / sig[ii])**2)
+    # CDOM and NAP absorption
+    CDOM = mag_cdom * np.exp(-slope_cdom * (wvns - lnot))
+    NAP = mag_nap * np.exp(-slope_nap * (wvns - lnot))
 
-    # multiply each Gaussian by the initial guess amplitude
-    for i in range(len(peak_locs)):
-        gaus[:, i] = Amp0[i + 8] * gaus[:, i]
+    # Gaussian absorption (a_phi)
+    gaus = np.exp(-0.5 * ((wvns_col - peak_locs) / sig)**2) * amps
+    APHI = np.sum(gaus, axis=1)
 
-    # Sum all of the Gaussians to get a_phi
-    APHI = np.zeros(len(wvns))
-    for j in range(len(wvns)):
-        APHI[j] = 0
-        for i in range(len(peak_locs)):
-           APHI[j] += gaus[j, i]
+    # Total particulate absorption
+    AP = NAP + APHI
 
-    # define cp (slope and magnitude can vary)
-    cp = (wvns/lnot)**(-Amp0[5])
-    CP = Amp0[6]*cp
+    # cp (total particle concentration)
+    CP = mag_cp * (wvns / lnot) ** (-slope_cp)
 
-    # total particulate absorption
-    AP = NAP + APHI.T
+    # BBP (backscatter from particles)
+    BBP = bbp_ratio * (CP - AP)
 
-    # define bbp in terms of the bbp:bp ratio, ap, and cp following Roesler & Boss, 2003
-    BBP = Amp0[4]*(CP-AP)
+    # Fluorescence Gaussian
+    fluor = np.exp(-0.5 * ((wvns - 685) / 10.6) ** 2)
+    F = fluor_amp * fluor
 
-    # Define the fluorescence Gaussian; 685 peak for Chl fluor; 10.6 sigma
-    fluor = np.zeros_like(wvns)
-    fluor = np.exp(-0.5 * ((wvns - 685) / 10.6)**2)
+    # Modeled U = bb / (a + bb)
+    denom = APHI + NAP + CDOM + a_sw_r + BBP + bb_sw_r
+    numer = BBP + bb_sw_r + F
+    Unew = numer / denom
 
-    F = Amp0[7]*fluor
-
-    # modeled U spectrum (U = bb/{a+bb})
-    denom = APHI + NAP.T + CDOM.T + a_sw_r.T + BBP.T + bb_sw_r
-    numer = BBP.T + bb_sw_r + F
-    Unew = numer/denom
-
-    # normalize by uncertainties during the minimization
-    spec_min = (Upos - Unew)/Uunc
+    # Weighted residual
+    spec_min = (Upos - Unew) / Uunc
 
     return spec_min
 
