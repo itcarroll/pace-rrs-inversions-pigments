@@ -92,13 +92,10 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
     Upos = (-G1 + np.sqrt(G1**2 + 4*G2*rrs))/(2*G2)
     Uunc = (-G1 + np.sqrt(G1**2 + 4*G2*rrs_unc))/(2*G2)
 
-    peaks = np.array([384,413,435,461,464,490,532,583])
-    sig = np.array([23,9,14,11,19,19,20,20])
-
     # Define the center peak locations (nm) and widths (nm) of the Gaussian functions
     # sig = sigma, where FWHM = sigma*2.355 and FWHM = full width at half max
-    peaks = np.array(peaks, dtype=float)
-    sig = np.array(sig, dtype=float)
+    peaks = np.array([384,413,435,461,464,490,532,583], dtype=float)
+    sig = np.array([23,9,14,11,19,19,20,20], dtype=float)
 
     #   Define the [lower bound, first guess, upper bound] for each parameter. These will be allowed to vary.
     s_nap = [.005, .011, .016]
