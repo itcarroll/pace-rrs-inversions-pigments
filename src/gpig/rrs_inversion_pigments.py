@@ -94,8 +94,8 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
 
     # Define the center peak locations (nm) and widths (nm) of the Gaussian functions
     # sig = sigma, where FWHM = sigma*2.355 and FWHM = full width at half max
-    peaks = np.array([384,413,435,461,464,490,532,583], dtype=float)
-    sig = np.array([23,9,14,11,19,19,20,20], dtype=float)
+    peaks = np.array([384,413,435,461,464,490,532,583,623,644,655,676], dtype=float)
+    sig = np.array([23,9,14,11,19,19,20,20,15,12,12,9], dtype=float)
 
     #   Define the [lower bound, first guess, upper bound] for each parameter. These will be allowed to vary.
     s_nap = [.005, .011, .016]
@@ -169,9 +169,9 @@ def lsqnonlin_Amp_gen(Amp0,Upos,Uunc,wvns,bb_sw_r,a_sw_r,lnot):
     mag_cp = Amp0[6]
     fluor_amp = Amp0[7]
 
-    amps = Amp0[8:16]                # Amplitudes of Gaussians
-    peak_locs = Amp0[16:24]          # Centers
-    sig = Amp0[24:32]                # Widths
+    amps = Amp0[8:20]                # Amplitudes of Gaussians
+    peak_locs = Amp0[20:32]          # Centers
+    sig = Amp0[32:44]                # Widths
 
     # Ensure broadcasting works
     wvns_col = wvns[:, np.newaxis]   # Shape (N, 1)
