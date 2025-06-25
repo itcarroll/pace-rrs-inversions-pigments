@@ -1,10 +1,1 @@
-Using the environment.yml file in the git repository, create a new conda environment using the terminal and open Jupyter Lab:
-
-```
-conda env create --file environment.yml
-conda activate pace
-python -m ipykernel install --user --name pace
-jupyter lab
-```
-
-Once jupyter lab is launched, turn on the pace kernel in the drop down menu in the top right corner.
+This branch uses coeffecients from an updated dataset of 162 samples that were derived using Python as opposed to the coefficients in Chase et. al., 2017 paper that were derived from a 97 sample dataset using Matlab. 
