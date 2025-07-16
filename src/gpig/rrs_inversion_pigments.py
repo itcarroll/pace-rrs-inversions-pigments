@@ -4,11 +4,12 @@ Translated to Python by Max Danenhower, Charles Stern, and Ali Chase.
 '''
 
 from typing import Tuple, Union
-from importlib import resources
+from importlib.resources import files
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import least_squares
+from numba import njit
 
 
 G1 = 0.0949  # g1 and g2 are values from Gordon et al., 1988
@@ -78,6 +79,10 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
 
     Rrs = Rrs[Iwl]
     Rrs_unc = Rrs_unc[Iwl]
+
+    # check for negatives
+    if np.any(Rrs<0):
+        return np.array([np.nan,np.nan,np.nan,np.nan]), 0,0,0
 
     # Get the absorption and backscattering by water for the temperature and
     # salinity measured coincidently with Rrs
@@ -155,6 +160,7 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
 
     return pigmedian, pigunc, vars_units, amps
 
+@njit(fastmath=True)
 def lsqnonlin_Amp_gen(Amp0,Upos,Uunc,wvns,bb_sw_r,a_sw_r,lnot):
     '''
     The following function uses a non-linear least squares solver to minimize
@@ -410,8 +416,8 @@ def betasw124_ZHH2009(lambda_, S, Tc, delta=0.039):
 
 def tempsal_corr(lambda_):
     """ """
-    with resources.path(__name__, "resources/Sullivan_pure_water_temp_sal.csv") as p:
-        pwts = pd.read_csv(p)
+    p = files("gpig").joinpath("resources/Sullivan_pure_water_temp_sal.csv")
+    pwts = pd.read_csv(p)
 
     if lambda_.min() < 400 or lambda_.min() > 750:
         raise NotImplementedError(
