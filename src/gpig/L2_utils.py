@@ -9,7 +9,6 @@ the area of the swath. Level 2 files have 1km resolution.
 '''
 
 import sys
-import math
 
 import numpy as np
 import cartopy.crs as ccrs
@@ -59,7 +58,8 @@ def load_data(tspan, bbox):
 
     sal_results = earthaccess.search_data(
         short_name='SMAP_JPL_L3_SSS_CAP_8DAY-RUNNINGMEAN_V5',
-        temporal=tspan
+        temporal=tspan,
+        count=1
     )
     if (len(sal_results) > 0):
         sal_paths = earthaccess.download(sal_results, 'sal_data')
@@ -69,7 +69,8 @@ def load_data(tspan, bbox):
 
     temp_results = earthaccess.search_data(
         short_name='MUR-JPL-L4-GLOB-v4.1',
-        temporal=tspan
+        temporal=tspan,
+        count=1
     )
     if (len(temp_results) > 0):
         temp_paths = earthaccess.download(temp_results, 'temp_data')
@@ -102,23 +103,9 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path):
         Dataset containing the Chla, Chlb, Chlc, and PPC concentration at each lat/lon coordinate
     '''
 
-    # define the 184 wavelengths used by PACE
-    wl_coord = np.array([339., 341., 344., 346., 348., 351., 353., 356., 358., 361., 363., 366.,
-                        368., 371., 373., 375., 378., 380., 383., 385., 388., 390., 393., 395.,
-                        398., 400., 403., 405., 408., 410., 413., 415., 418., 420., 422., 425.,
-                        427., 430., 432., 435., 437., 440., 442., 445., 447., 450., 452., 455.,
-                        457., 460., 462., 465., 467., 470., 472., 475., 477., 480., 482., 485.,
-                        487., 490., 492., 495., 497., 500., 502., 505., 507., 510., 512., 515.,
-                        517., 520., 522., 525., 527., 530., 532., 535., 537., 540., 542., 545.,
-                        547., 550., 553., 555., 558., 560., 563., 565., 568., 570., 573., 575.,
-                        578., 580., 583., 586., 588., 591., 593., 596., 598., 601., 603., 605.,
-                        608., 610., 613., 615., 618., 620., 623., 625., 627., 630., 632., 635.,
-                        637., 640., 641., 642., 643., 645., 646., 647., 648., 650., 651., 652.,
-                        653., 655., 656., 657., 658., 660., 661., 662., 663., 665., 666., 667.,
-                        668., 670., 671., 672., 673., 675., 676., 677., 678., 679., 681., 682.,
-                        683., 684., 686., 687., 688., 689., 691., 692., 693., 694., 696., 697.,
-                        698., 699., 701., 702., 703., 704., 706., 707., 708., 709., 711., 712.,
-                        713., 714., 717., 719.])
+    # define wavelengths
+    sensor_band_params = xr.open_dataset(L2_path, group='sensor_band_parameters')
+    wavelength_coords = sensor_band_params.wavelength_3d.values
     
     dataset = xr.open_dataset(L2_path, group='geophysical_data')
     rrs = dataset['Rrs']
@@ -183,10 +170,10 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path):
     sal = sal.interp(longitude=rrs_box.longitude, latitude=rrs_box.latitude, method='nearest')
     temp = temp.interp(lon=rrs_box.longitude, lat=rrs_box.latitude, method='nearest')
 
-    rrs_box['chla'] = (('number_of_lines', 'pixels_per_line'), np.zeros((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size)))
-    rrs_box['chlb'] = (('number_of_lines', 'pixels_per_line'), np.zeros((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size)))
-    rrs_box['chlc'] = (('number_of_lines', 'pixels_per_line'), np.zeros((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size)))
-    rrs_box['ppc'] = (('number_of_lines', 'pixels_per_line'), np.zeros((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size)))
+    rrs_box['chla'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
+    rrs_box['chlb'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
+    rrs_box['chlc'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
+    rrs_box['ppc'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
 
     progress = 1 # keeps track of how many pixels have been calculated
     pixels = rrs_box.number_of_lines.size * rrs_box.pixels_per_line.size
@@ -203,8 +190,8 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path):
             ru = rrs_unc_box[i][j].to_numpy()
             sal_val = sal[i][j].values.item()
             temp_val = temp[i][j].values.item()
-            if not (math.isnan(r[0]) or math.isnan(sal_val) or math.isnan(temp_val)):
-                pigs = rrs_inversion_pigments(r, ru, wl_coord, temp_val, sal_val)[0]
+            if not (np.isnan(r[0]) or np.isnan(sal_val) or np.isnan(temp_val)):
+                pigs = rrs_inversion_pigments(r, ru, wavelength_coords, temp_val, sal_val)[0]
                 rrs_box['chla'][i][j] = pigs[0]
                 rrs_box['chlb'][i][j] = pigs[1]
                 rrs_box['chlc'][i][j] = pigs[2]
