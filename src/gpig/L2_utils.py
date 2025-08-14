@@ -35,8 +35,8 @@ def load_data(tspan, bbox):
 
     Returns:
     --------
-    L2_path : string
-        A single file path to a PACE L2 AOP file.
+    L2_path : list
+        A list of file paths to a PACE L2 AOP files intersecting the passed in bounding box.
     sal_path : string
         A single file path to a salinity file.
     temp_path : string
@@ -46,10 +46,8 @@ def load_data(tspan, bbox):
     L2_results = earthaccess.search_data(
         short_name='PACE_OCI_L2_AOP',
         bounding_box=bbox,
-        temporal=tspan,
-        count=1
+        temporal=tspan
     )
-
     if (len(L2_results) > 0):
         L2_paths = earthaccess.download(L2_results, 'L2_data')
     else:
@@ -78,9 +76,33 @@ def load_data(tspan, bbox):
         temp_paths = []
         print('No temperature data found')
 
-    return L2_paths[0], sal_paths[0], temp_paths[0]
+    return L2_paths, sal_paths[0], temp_paths[0]
 
-def estimate_inv_pigments(L2_path, sal_path, temp_path):
+def get_granule_boundary(L2_files):
+    '''
+    Print out boundaries for each L2 file
+
+    Parameters:
+    -----------
+    L2_files : list of file paths
+        A list of L2 file paths
+    '''
+
+    for i,L2_path in enumerate(L2_files):
+        dataset = xr.open_dataset(L2_path, group="navigation_data")
+        dataset = dataset.set_coords(("longitude", "latitude"))
+
+        n_bound = dataset.latitude.values.max()
+        s_bound = dataset.latitude.values.min() 
+        e_bound = dataset.longitude.values.max()
+        w_bound = dataset.longitude.values.min()
+
+        print('file name:',L2_path)
+        print('file index:',i)
+        print(f'granule bounding box (w, s, e, n): ({w_bound}, {s_bound}, {e_bound}, {n_bound})')
+        print('-----------')
+
+def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
     '''
     Uses the rrs_inversion_pigments algorithm to calculate chlorophyll a (Chla), chlorophyll b (Chlb), chlorophyll c1
     +c2 (Chlc12), and photoprotective carotenoids (PPC) given an Rrs spectra, salinity, and temperature. Relies on user input to 
@@ -96,6 +118,9 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path):
         A single file path to a salinity file.
     temp_path : str
         A single file path to a temperature file.
+    bbox : tuple of floats or ints
+        A tuple representing spatial bounds in the form (lower_left_lon, lower_left_lat, upper_right_lon, upper_right_lat).
+        Default is None, which means the entire L2 granule will be processed
 
     Returns:
     --------
@@ -117,22 +142,13 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path):
     dataset_r = xr.merge((rrs, dataset.coords))
     dataset_ru = xr.merge((rrs_unc, dataset.coords))
 
-    n_bound = dataset_r.latitude.values.max()
-    s_bound = dataset_r.latitude.values.min() 
-    e_bound = dataset_r.longitude.values.max()
-    w_bound = dataset_r.longitude.values.min()
+    if bbox is not None:
+        w,s,e,n = bbox[0],bbox[1],bbox[2],bbox[3]
 
-    #Retrieve user input, the user inputted boundary box must be within the boundaries of the L2 files swath. 
-    print('The downloaded L2 file has latitude boundaries', n_bound, 'to', s_bound, ', longitude boundaries', e_bound, 'to', w_bound)
-    print('Select a boundary box within these coordinates to calculate pigments for')
+        print(L2_path)
+        print(w,s,e,n)
 
-    while True:
         try:
-            n = _get_user_boundary(s_bound, n_bound, 'north')
-            s = _get_user_boundary(s_bound, n, 'south')
-            e = _get_user_boundary(w_bound, e_bound, 'east')
-            w = _get_user_boundary(w_bound, e, 'west')
-
             rrs_box = dataset_r["Rrs"].where(
                 (
                     (dataset["latitude"] > s)
@@ -143,20 +159,43 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path):
                 drop=True,
             )
 
-            break
+            rrs_unc_box = dataset_ru["Rrs_unc"].where(
+                (
+                    (dataset["latitude"] > s)
+                    & (dataset["latitude"] < n)
+                    & (dataset["longitude"] < e)
+                    & (dataset["longitude"] > w)
+                ),
+                drop=True,
+            )
         except ValueError:
-            print('Could not create boundary box. This is most likely due to the PACE level 2 data file\'s coordinate system not being girdded.')
-            print('Try increasing the size of the boundary box.')
+            print('Boundary box is outside of the granule boundary.')
+            raise
+    else:
+        n = dataset.latitude.values.max()
+        s = dataset.latitude.values.min() 
+        e = dataset.longitude.values.max()
+        w = dataset.longitude.values.min()
 
-    rrs_unc_box = dataset_ru["Rrs_unc"].where(
-        (
-            (dataset["latitude"] > s)
-            & (dataset["latitude"] < n)
-            & (dataset["longitude"] < e)
-            & (dataset["longitude"] > w)
-        ),
-        drop=True,
-    )
+        rrs_box = dataset_r["Rrs"].where(
+            (
+                (dataset["latitude"] > s)
+                & (dataset["latitude"] < n)
+                & (dataset["longitude"] < e)
+                & (dataset["longitude"] > w)
+            ),
+            drop=True,
+        )
+
+        rrs_unc_box = dataset_ru["Rrs_unc"].where(
+            (
+                (dataset["latitude"] > s)
+                & (dataset["latitude"] < n)
+                & (dataset["longitude"] < e)
+                & (dataset["longitude"] > w)
+            ),
+            drop=True,
+        )
 
     sal = xr.open_dataset(sal_path)
     sal = sal["smap_sss"].sel({"latitude": slice(n, s), "longitude": slice(w, e)})
@@ -226,34 +265,3 @@ def plot_pigments(data, lower_bound, upper_bound):
     data.plot(x="longitude", y="latitude", cmap=custom_cmap, ax=ax, norm=norm)
     ax.add_feature(cfeature.LAND, facecolor='white', zorder=1)
     plt.show()
-
-def _get_user_boundary(lower_bound, upper_bound, card_dir):
-    '''
-    Retrieves user input for boudary box coordinates.
-
-    Parameters:
-    -----------
-    lower_bound : int or float
-        Lowest value the user can input.
-    upper_bound : int or float
-        Highest values the user can input.
-    card_dir : str
-        The cardinal direction the user is selecting a boundary for. Either 'north', 'south', 'east', or 'west'. 
-
-    Returns:
-    --------
-    int or float
-        The boundary inputted by the user. 
-    '''
-    while True:
-        usr_inp = input(card_dir + ' (between ' + str(upper_bound) + ' and ' + str(lower_bound) + '): ')
-        try:
-            usr_inp = usr_inp.strip()
-            usr_inp = float(usr_inp)
-            if usr_inp < upper_bound and usr_inp > lower_bound:
-                break
-            else:
-                print('Value must be between ' + str(upper_bound) + ' and ' + str(lower_bound) + '.')
-        except ValueError:
-            print('Must enter a float.')
-    return usr_inp
