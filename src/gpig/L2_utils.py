@@ -87,7 +87,9 @@ def get_granule_boundary(L2_files):
     L2_files : list of file paths
         A list of L2 file paths
     '''
-
+    if len(L2_files) < 0:
+        print('File list is empty.')
+        return
     for i,L2_path in enumerate(L2_files):
         dataset = xr.open_dataset(L2_path, group="navigation_data")
         dataset = dataset.set_coords(("longitude", "latitude"))
