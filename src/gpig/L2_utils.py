@@ -49,7 +49,7 @@ def load_data(tspan, bbox):
         temporal=tspan
     )
     if (len(L2_results) > 0):
-        L2_paths = earthaccess.download(L2_results, 'L2_data')
+        L2_paths = earthaccess.download(L2_results, 'L2_rrs_data')
     else:
         L2_paths = []
         print('No L2 AOP data found')

@@ -48,7 +48,7 @@ def load_data(tspan, resolution):
         granule_name='*.DAY.*.Rrs.' + resolution + '.*'
     )
     if (len(rrs_results) > 0):
-        rrs_paths = earthaccess.download(rrs_results, 'rrs_data')
+        rrs_paths = earthaccess.download(rrs_results, 'L3_rrs_data')
     else:
         rrs_paths = []
         print('No Rrs data found')
