@@ -143,13 +143,12 @@ def estimate_inv_pigments(rrs_paths, sal_paths, temp_paths, bbox):
             'chla': (['lat', 'lon'], chla),
             'chlb': (['lat', 'lon'], chlb),
             'chlc': (['lat', 'lon'], chlc),
-            'ppc': (['lat', 'lon'], ppc)
+            'ppc': (['lat', 'lon'], ppc),
         },
         coords={
             'lat': box.lat.to_numpy(),
-            'lon': box.lon.to_numpy()
-        }
-
+            'lon': box.lon.to_numpy(),
+        },
     )
 
     return pigments
@@ -312,7 +311,7 @@ def _create_dataset(rrs_paths, sal_paths, temp_paths, bbox):
         rrs_data = xr.open_mfdataset(
             rrs_paths,
             combine="nested",
-            concat_dim="date"
+            concat_dim="date",
         )
         rrs = rrs_data["Rrs"].sel({"lat": slice(n, s), "lon": slice(w, e)}).mean('date')
         rrs = rrs.compute()
@@ -328,7 +327,7 @@ def _create_dataset(rrs_paths, sal_paths, temp_paths, bbox):
         sal = xr.open_mfdataset(
             sal_paths,
             combine="nested",
-            concat_dim="date"
+            concat_dim="date",
         )
         sal = sal["smap_sss"].interp(longitude=rrs.lon, latitude=rrs.lat, method='nearest').mean('date')
         sal = sal.compute()
@@ -361,8 +360,8 @@ def _create_dataset(rrs_paths, sal_paths, temp_paths, bbox):
         coords={
             "lat": rrs.lat,
             "lon": rrs.lon,
-            'wavelength': rrs.wavelength
-        }
+            'wavelength': rrs.wavelength,
+        },
     )
 
     return combined_ds
