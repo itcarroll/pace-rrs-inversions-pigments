@@ -177,18 +177,15 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
             drop=True,
         )
 
+    # mesh salinity and temperature onto the same coordinate system as Rrs and Rrs uncertainty
     sal = xr.open_dataset(sal_path)
-    sal = sal["smap_sss"].sel({"latitude": slice(n, s), "longitude": slice(w, e)})
-
+    sal = sal["smap_sss"]
+    sal = sal.interp(longitude=rrs_box.longitude, latitude=rrs_box.latitude, method='nearest')    
     temp = xr.open_dataset(temp_path)
     temp = temp['analysed_sst'].squeeze() # get rid of extra time dimension
-    temp = temp.sel({"lat": slice(s, n), "lon": slice(w, e)})
-    temp = temp - 273 # convert from kelvin to celcius
-
-    # mesh salinity and temperature onto the same coordinate system as Rrs and Rrs uncertainty
-    sal = sal.interp(longitude=rrs_box.longitude, latitude=rrs_box.latitude, method='nearest')
     temp = temp.interp(lon=rrs_box.longitude, lat=rrs_box.latitude, method='nearest')
-
+    temp = temp - 273 # convert from kelvin to celcius
+    
     rrs_box['chla'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
     rrs_box['chlb'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
     rrs_box['chlc'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
@@ -206,7 +203,7 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
             progress += 1
 
             r = rrs_box["Rrs"][i][j].to_numpy()
-            ru = rrs_unc_box["Rrs_unc"][i][j].to_numpy()
+            ru = rrs_box["Rrs_unc"][i][j].to_numpy()
             sal_val = sal[i][j].values.item()
             temp_val = temp[i][j].values.item()
             if not (np.isnan(r[0]) or np.isnan(sal_val) or np.isnan(temp_val)):
@@ -216,7 +213,7 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
                 rrs_box['chlc'][i][j] = pigs[2]
                 rrs_box['ppc'][i][j] = pigs[3]
     
-    return rrs_box
+    return rrs_box[['chla', 'chlb', 'chlc', 'ppc']]
 
 def plot_pigments(data, lower_bound, upper_bound):
     '''

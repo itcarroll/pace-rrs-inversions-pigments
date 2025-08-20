@@ -129,7 +129,7 @@ def estimate_inv_pigments(rrs_paths, sal_paths, temp_paths, bbox):
             Rrs[Rrs == 0] = 0.000001 # insure no zero values
             Rrs_unc = Rrs * 0.05 # 5% uncertianty used for all values
             sal = float(box['sal'][lat][lon].data)
-            temp = float(box['temp'][lat][lon].data) - 273 # convert from kelvin to celcius
+            temp = float(box['temp'][lat][lon].data)
 
             if not (np.isnan(Rrs[0]) or np.isnan(sal) or np.isnan(temp)):
                 vals = rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal)
@@ -322,7 +322,7 @@ def _create_dataset(rrs_paths, sal_paths, temp_paths, bbox):
     # creates a dataset of sal and temp values of the given file
     if isinstance(sal_paths, str):
         sal = xr.open_dataset(sal_paths)
-        sal = sal["smap_sss"].sel({"latitude": slice(n, s), "longitude": slice(w, e)})
+        sal = sal["smap_sss"].interp(longitude=rrs.lon, latitude=rrs.lat, method='nearest')
     elif isinstance(sal_paths, list):
         # if given a list of files, create a date averaged dataset of salinity values 
         sal = xr.open_mfdataset(
@@ -330,7 +330,7 @@ def _create_dataset(rrs_paths, sal_paths, temp_paths, bbox):
             combine="nested",
             concat_dim="date"
         )
-        sal = sal["smap_sss"].sel({"latitude": slice(n, s), "longitude": slice(w, e)}).mean('date')
+        sal = sal["smap_sss"].interp(longitude=rrs.lon, latitude=rrs.lat, method='nearest').mean('date')
         sal = sal.compute()
     else:
         raise TypeError('temp_paths must be a string or list')
@@ -339,7 +339,7 @@ def _create_dataset(rrs_paths, sal_paths, temp_paths, bbox):
     if isinstance(temp_paths, str):
         temp = xr.open_dataset(temp_paths)
         temp = temp['analysed_sst'].squeeze() # get rid of extra time dimension
-        temp = temp.sel({"lat": slice(s, n), "lon": slice(w, e)})
+        temp = temp.interp(lon=rrs.lon, lat=rrs.lat, method='nearest')
     elif isinstance(temp_paths, list):
         # if given a list of files, create a date averaged dataset of temperature values 
         temp = xr.open_mfdataset(
@@ -347,20 +347,16 @@ def _create_dataset(rrs_paths, sal_paths, temp_paths, bbox):
             combine="nested",
             concat_dim="time"
         )
-        temp = temp['analysed_sst'].sel({"lat": slice(s, n), "lon": slice(w, e)}).mean('time')
+        temp = temp['analysed_sst'].interp(lon=rrs.lon, lat=rrs.lat, method='nearest').mean('time')
         temp = temp.compute()
     else:
         raise TypeError('temp_paths must be a string or list')
     
-    # merge datasets to Rrs coordinates
-    sal = sal.interp(longitude=rrs.lon, latitude=rrs.lat, method='nearest')
-    temp = temp.interp(lon=rrs.lon, lat=rrs.lat, method='nearest')
-
     combined_ds = xr.Dataset(
         {
             "rrs": (["lat", "lon", 'wavelength'], rrs.data),
             'sal': (["lat", "lon"], sal.data),
-            'temp': (["lat", "lon"], temp.data)
+            'temp': (["lat", "lon"], temp.data - 273), # convert from kelvin to celcius
         },
         coords={
             "lat": rrs.lat,
