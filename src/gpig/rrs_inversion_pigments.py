@@ -17,8 +17,7 @@ G2 = 0.0794
 LNOT = 400  # reference lambda wavelength (nm)
 
 def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
-    '''
-    Inversion algorithm to estimate phytoplankton pigments from Rrs spectra
+    '''Inversion algorithm to estimate phytoplankton pigments from Rrs spectra
 
     Ali Chase, University of Maine, 2017 - 2019
 
@@ -53,20 +52,20 @@ def rrs_inversion_pigments(Rrs, Rrs_unc, wl, temp, sal):
                 
     Returns:
     --------
-    pigmedian : Numpy array
+    numpy.ndarray
         Estimated pigment concentrations
-    pig_unc : Numpy Array
+    numpy.ndarray
         Uncertainties in estimated pigments,
         calculated using a Monte Carlo method that in turn uses the 
         reported uncertainties in the A and B coefficients reported
         in Chase et al. (2017). 
-    vars_units : str
+    str
         The names and units of the estimated pigments:
         chlorophyll a (Chla), chlorophyll b (Chlb), chlorophyll c1
         +c2 (Chlc12), and photoprotective carotenoids (PPC) defined
         as abcarotene+zeaxanthin+alloxanthin+diadinoxanthin. All
         pigments and uncertainties are in mg m^-3.
-    amps : Numpy array
+    numpy.ndarray
         Amplitudes of Gaussian absorption functions
         representing Chla, Chlb, Chlc12, and PPC. Can be used to derive
         updated relationships between Gaussians and HPLC pigments.
@@ -415,7 +414,8 @@ def betasw124_ZHH2009(lambda_, S, Tc, delta=0.039):
 
 
 def tempsal_corr(lambda_):
-    """ """
+    """
+    """
     p = files("gpig").joinpath("resources/Sullivan_pure_water_temp_sal.csv")
     pwts = pd.read_csv(p)
 
@@ -450,9 +450,9 @@ def get_water_iops(lambda_, T=22, S=35):
 
     Returns
     -------
-    a_sw: (array)
+    numpy.ndarray
         Absorption of seawater at each wavelength in wavel for the specified temperature and salinity values.
-    bb_sw: (array)
+    numpy.ndarray
         Backscattering of seawater at each wavelenght in wavel for the specified temperature and salinity values.
     """
     lambda_water1 = [250, 260, 270, 280, 290] + list(range(300, 551, 2))

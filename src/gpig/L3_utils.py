@@ -23,7 +23,7 @@ from .rrs_inversion_pigments import rrs_inversion_pigments
 def load_data(tspan, resolution):
     '''
     Downloads Remote Sensing Reflectance (Rrs) data from the PACE Satellite, as well as salinity and temperature data (from different 
-    missions), and saves the data files to local folders named 'rrs_data', 'sal_data', and 'temp_data'.
+    missions), and saves the data files to local folders named 'L3_rrs_data', 'sal_data', and 'temp_data'.
 
     Parameters:
     -----------
@@ -34,11 +34,11 @@ def load_data(tspan, resolution):
 
     Returns:
     --------
-    rrs_paths : list
+    list
         A list containing the file path(s) to the downloaded Rrs PACE files.
-    sal_paths : list
+    list
         A list containing the file path(s) to the downloaded salinity files.
-    temp_paths : list
+    list
         A list containing the file path(s) to the downloaded temperature files.
     '''
 
@@ -100,7 +100,7 @@ def estimate_inv_pigments(rrs_paths, sal_paths, temp_paths, bbox):
 
     Returns:
     --------
-    Xarray dataset 
+    xarray.Dataset
         Dataset containing the Chla, Chlb, Chlc, and PPC concentration at each lat/lon coordinate
     '''
     
@@ -173,7 +173,7 @@ def estimate_cov_pigments(tspan, bbox):
 
     Returns:
     --------
-    Xarray dataset 
+    xarray.Dataset 
         Dataset containing the Chla, Chlb, Chlc, and PPC concentration at each lat/lon coordinate.
     '''
     
@@ -289,7 +289,7 @@ def _create_dataset(rrs_paths, sal_paths, temp_paths, bbox):
 
     Returns:
     --------
-    Xarray data array
+    xarray.Dataset
         A data array of Rrs values at each wavelength over a specified lat/lon box.
 
     Raises:
