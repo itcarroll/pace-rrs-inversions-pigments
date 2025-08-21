@@ -24,7 +24,7 @@ from .rrs_inversion_pigments import rrs_inversion_pigments
 def load_data(tspan, bbox):
     '''
     Downloads one L2 PACE apparent optical properties (AOP) file that intersects the coordinate box passed in, as well as 
-    temperature and salinity files. Data files are saved to local folders named 'L2_data', 'sal_data', and 'temp_data'.
+    temperature and salinity files. Data files are saved to local folders named 'L2_rrs_data', 'sal_data', and 'temp_data'.
 
     Parameters:
     -----------
@@ -35,11 +35,11 @@ def load_data(tspan, bbox):
 
     Returns:
     --------
-    L2_path : list
+    list
         A list of file paths to a PACE L2 AOP files intersecting the passed in bounding box.
-    sal_path : string
+    string
         A single file path to a salinity file.
-    temp_path : string
+    string
         A single file path to a temperature file.
     '''
 
@@ -126,7 +126,7 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
 
     Returns:
     --------
-    Xarray dataset 
+    xarray.Dataset
         Dataset containing the Chla, Chlb, Chlc, and PPC concentration at each lat/lon coordinate
     '''
 
@@ -135,14 +135,12 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
     wavelength_coords = sensor_band_params.wavelength_3d.values
     
     dataset = xr.open_dataset(L2_path, group='geophysical_data')
-    rrs = dataset['Rrs']
-    rrs_unc = dataset['Rrs_unc']
+    rrs = dataset[['Rrs', 'Rrs_unc']]
 
     # Add latitude and longitude coordinates to the Rrs and Rrs uncertainty datasets
     dataset = xr.open_dataset(L2_path, group="navigation_data")
     dataset = dataset.set_coords(("longitude", "latitude"))
-    dataset_r = xr.merge((rrs, dataset.coords))
-    dataset_ru = xr.merge((rrs_unc, dataset.coords))
+    rrs = xr.merge((rrs, dataset.coords))
 
     if bbox is not None:
         w,s,e,n = bbox[0],bbox[1],bbox[2],bbox[3]
@@ -151,22 +149,12 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
         print(w,s,e,n)
 
         try:
-            rrs_box = dataset_r["Rrs"].where(
+            rrs_box = rrs.where(
                 (
-                    (dataset["latitude"] > s)
-                    & (dataset["latitude"] < n)
-                    & (dataset["longitude"] < e)
-                    & (dataset["longitude"] > w)
-                ),
-                drop=True,
-            )
-
-            rrs_unc_box = dataset_ru["Rrs_unc"].where(
-                (
-                    (dataset["latitude"] > s)
-                    & (dataset["latitude"] < n)
-                    & (dataset["longitude"] < e)
-                    & (dataset["longitude"] > w)
+                    (rrs["latitude"] > s)
+                    & (rrs["latitude"] < n)
+                    & (rrs["longitude"] < e)
+                    & (rrs["longitude"] > w)
                 ),
                 drop=True,
             )
@@ -179,7 +167,7 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
         e = dataset.longitude.values.max()
         w = dataset.longitude.values.min()
 
-        rrs_box = dataset_r["Rrs"].where(
+        rrs_box = rrs.where(
             (
                 (dataset["latitude"] > s)
                 & (dataset["latitude"] < n)
@@ -188,29 +176,16 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
             ),
             drop=True,
         )
-
-        rrs_unc_box = dataset_ru["Rrs_unc"].where(
-            (
-                (dataset["latitude"] > s)
-                & (dataset["latitude"] < n)
-                & (dataset["longitude"] < e)
-                & (dataset["longitude"] > w)
-            ),
-            drop=True,
-        )
-
-    sal = xr.open_dataset(sal_path)
-    sal = sal["smap_sss"].sel({"latitude": slice(n, s), "longitude": slice(w, e)})
-
-    temp = xr.open_dataset(temp_path)
-    temp = temp['analysed_sst'].squeeze() # get rid of extra time dimension
-    temp = temp.sel({"lat": slice(s, n), "lon": slice(w, e)})
-    temp = temp - 273 # convert from kelvin to celcius
 
     # mesh salinity and temperature onto the same coordinate system as Rrs and Rrs uncertainty
-    sal = sal.interp(longitude=rrs_box.longitude, latitude=rrs_box.latitude, method='nearest')
+    sal = xr.open_dataset(sal_path)
+    sal = sal["smap_sss"]
+    sal = sal.interp(longitude=rrs_box.longitude, latitude=rrs_box.latitude, method='nearest')    
+    temp = xr.open_dataset(temp_path)
+    temp = temp['analysed_sst'].squeeze() # get rid of extra time dimension
     temp = temp.interp(lon=rrs_box.longitude, lat=rrs_box.latitude, method='nearest')
-
+    temp = temp - 273 # convert from kelvin to celcius
+    
     rrs_box['chla'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
     rrs_box['chlb'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
     rrs_box['chlc'] = (('number_of_lines', 'pixels_per_line'), np.full((rrs_box.number_of_lines.size, rrs_box.pixels_per_line.size),np.nan))
@@ -220,15 +195,15 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
     pixels = rrs_box.number_of_lines.size * rrs_box.pixels_per_line.size
 
     # for each coordinate estimate the pigment concentrations
-    for i in range(len(rrs_box.number_of_lines)):
-        for j in range(len(rrs_box.pixels_per_line)):
+    for i in range(rrs_box.sizes["number_of_lines"]):
+        for j in range(rrs_box.sizes["pixels_per_line"]):
             # prints total number of pixels and how many have been estimated already
             sys.stdout.write('\rProgress: ' + str(progress) + '/' + str(pixels))
             sys.stdout.flush()
             progress += 1
 
-            r = rrs_box[i][j].to_numpy()
-            ru = rrs_unc_box[i][j].to_numpy()
+            r = rrs_box["Rrs"][i][j].to_numpy()
+            ru = rrs_box["Rrs_unc"][i][j].to_numpy()
             sal_val = sal[i][j].values.item()
             temp_val = temp[i][j].values.item()
             if not (np.isnan(r[0]) or np.isnan(sal_val) or np.isnan(temp_val)):
@@ -238,7 +213,7 @@ def estimate_inv_pigments(L2_path, sal_path, temp_path, bbox=None):
                 rrs_box['chlc'][i][j] = pigs[2]
                 rrs_box['ppc'][i][j] = pigs[3]
     
-    return rrs_box
+    return rrs_box[['chla', 'chlb', 'chlc', 'ppc']]
 
 def plot_pigments(data, lower_bound, upper_bound):
     '''
